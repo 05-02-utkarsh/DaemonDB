@@ -8,21 +8,12 @@ import (
 	lex "DaemonDB/query_parser/lexer"
 	"DaemonDB/query_parser/parser"
 	"DaemonDB/wal_manager"
-<<<<<<< HEAD
 
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-=======
-	"bufio"
-	"bytes"
-	"fmt"
-	"log"
-	"os"
-	"strings"
->>>>>>> 7e45a0c662a830cd99d00b75eb130fc9f506a3dc
 )
 
 type QueryRequest struct {
@@ -56,7 +47,6 @@ func main() {
 	}
 
 	vm := executor.NewVM(tree, heapFileManager, walManager)
-	defer vm.CloseIndexCache()
 
 	if err := vm.RecoverAndReplayFromWAL(); err != nil {
 		walManager.Close()
@@ -78,41 +68,21 @@ func main() {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
-		if line == "?" || strings.EqualFold(line, "help") {
-			printHelp()
-			continue
-		}
 
-<<<<<<< HEAD
 		query := req.Query
-=======
-		query := line
->>>>>>> 7e45a0c662a830cd99d00b75eb130fc9f506a3dc
 
 		// Lexer + Parser
 		l := lex.New(query)
 		p := parser.New(l)
 
-		stmt, err := p.ParseStatement()
-		if err != nil {
-			fmt.Printf("Parse error: %v\n", err)
-			continue
-		}
+		stmt := p.ParseStatement()
 
 		// AST output
 		astOutput := fmt.Sprintf("%#v", stmt)
 
-<<<<<<< HEAD
 		// Bytecode
 		instructions := codegen.EmitBytecode(stmt)
 		bytecodeOutput := ""
-=======
-		instructions, err := codegen.EmitBytecode(stmt)
-		if err != nil {
-			fmt.Printf("Codegen error: %v\n", err)
-			continue
-		}
->>>>>>> 7e45a0c662a830cd99d00b75eb130fc9f506a3dc
 		for i, instr := range instructions {
 			bytecodeOutput += fmt.Sprintf(
 				"%d: OP=%v, VALUE=%v\n",
@@ -120,18 +90,12 @@ func main() {
 			)
 		}
 
-<<<<<<< HEAD
 		// Execute
 		err = vm.Execute(instructions)
 
 		response := QueryResponse{
 			AST:      astOutput,
 			Bytecode: bytecodeOutput,
-=======
-		fmt.Println("\n=== Execution ===")
-		if err := vm.Execute(instructions); err != nil {
-			fmt.Printf("Execution error: %v\n", err)
->>>>>>> 7e45a0c662a830cd99d00b75eb130fc9f506a3dc
 		}
 
 		if err != nil {
@@ -146,18 +110,4 @@ func main() {
 
 	log.Println("DaemonDB server running on port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-func printHelp() {
-	fmt.Println("Supported commands:")
-	fmt.Println("  SHOW DATABASES")
-	fmt.Println("  CREATE DATABASE <name>")
-	fmt.Println("  USE <database>")
-	fmt.Println("  CREATE TABLE <name> ( col type [primary key], ... )")
-	fmt.Println("  INSERT INTO <table> VALUES ( val1, val2, ... )")
-	fmt.Println("  SELECT * FROM <table> [ WHERE col = value ]")
-	fmt.Println("  SELECT * FROM t1 [ INNER|LEFT|RIGHT|FULL ] JOIN t2 ON col1 = col2 [ WHERE ... ]")
-	fmt.Println("  BEGIN; COMMIT; ROLLBACK")
-	fmt.Println("  exit")
-	fmt.Println("Note: UPDATE/DELETE/DROP are parsed but not executed yet.")
 }
