@@ -11,6 +11,7 @@ import (
 	"bufio"
 	"bytes"
 	"log"
+	"net/http"
 
 	// "bytes"
 	"fmt"
@@ -43,6 +44,43 @@ func main() {
 		walManager.Close()
 		log.Fatal(err)
 	}
+	// ----------------------
+	// HTTP SERVER (ADDED)
+	// ----------------------
+	go func() {
+
+		http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
+
+			if r.Method != http.MethodGet {
+				http.Error(w, "Only GET allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			query := r.URL.Query().Get("q")
+			if query == "" {
+				http.Error(w, "Missing query parameter 'q'", http.StatusBadRequest)
+				return
+			}
+
+			// Lexer + Parser
+			l := lex.New(query)
+			p := parser.New(l)
+			stmt := p.ParseStatement()
+
+			instructions := codegen.EmitBytecode(stmt)
+
+			if err := vm.Execute(instructions); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			w.Write([]byte("Execution successful"))
+		})
+
+		fmt.Println("HTTP server running on port 8080...")
+		log.Fatal(http.ListenAndServe(":8080", nil))
+
+	}()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	// REPL
