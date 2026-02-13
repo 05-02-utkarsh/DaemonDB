@@ -51,18 +51,24 @@ func main() {
 
 		http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
 
-			if r.Method != http.MethodGet {
-				http.Error(w, "Only GET allowed", http.StatusMethodNotAllowed)
-				return
+			var query string
+
+			// Support GET
+			if r.Method == http.MethodGet {
+				query = r.URL.Query().Get("q")
 			}
 
-			query := r.URL.Query().Get("q")
+			// Support POST form
+			if r.Method == http.MethodPost {
+				r.ParseForm()
+				query = r.FormValue("q")
+			}
+
 			if query == "" {
 				http.Error(w, "Missing query parameter 'q'", http.StatusBadRequest)
 				return
 			}
 
-			// Lexer + Parser
 			l := lex.New(query)
 			p := parser.New(l)
 			stmt := p.ParseStatement()
