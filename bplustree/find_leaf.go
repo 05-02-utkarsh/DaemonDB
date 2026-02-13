@@ -9,9 +9,8 @@ func (t *BPlusTree) FindLeaf(nodeId int64, key []byte) *Node {
 		if err != nil || n == nil {
 			return nil
 		}
-		_ = t.cache.Pin(n.id)
 		if n.nodeType == NodeLeaf {
-			return n // caller must Unpin when done
+			return n
 		}
 		i := lowerBound(n.key, key, t.cmp)
 		if i < 0 {
@@ -19,13 +18,10 @@ func (t *BPlusTree) FindLeaf(nodeId int64, key []byte) *Node {
 		}
 		if i >= len(n.children) {
 			if len(n.children) == 0 {
-				_ = t.cache.Unpin(n.id)
 				return nil
 			}
 			i = len(n.children) - 1
 		}
-		nextId := n.children[i]
-		_ = t.cache.Unpin(n.id)
-		nodeId = nextId
+		nodeId = n.children[i]
 	}
 }

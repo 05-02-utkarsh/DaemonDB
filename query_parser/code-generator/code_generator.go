@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func EmitBytecode(stmt parser.Statement) ([]executor.Instruction, error) {
+func EmitBytecode(stmt parser.Statement) []executor.Instruction {
 
 	instructions := []executor.Instruction{}
 
@@ -73,7 +73,7 @@ func EmitBytecode(stmt parser.Statement) ([]executor.Instruction, error) {
 
 		payloadJSON, err := json.Marshal(payload)
 		if err != nil {
-			return nil, fmt.Errorf("failed to serialize table schema: %w", err)
+			panic(fmt.Sprintf("failed to serialize table schema: %v", err))
 		}
 
 		// Push schema payload
@@ -136,12 +136,12 @@ func EmitBytecode(stmt parser.Statement) ([]executor.Instruction, error) {
 		})
 
 	default:
-		return nil, fmt.Errorf("unknown statement type (no bytecode emitted)")
+		fmt.Println("Unknown statement")
 	}
 
 	// for END of queries
 	instructions = append(instructions, executor.Instruction{
 		Op: executor.OP_END,
 	})
-	return instructions, nil
+	return instructions
 }

@@ -8,38 +8,29 @@ import (
 	lex "DaemonDB/query_parser/lexer"
 	"DaemonDB/query_parser/parser"
 	"DaemonDB/wal_manager"
-
+	"bufio"
 	"bytes"
-	"encoding/json"
-	"fmt"
 	"log"
-	"net/http"
+
+	// "bytes"
+	"fmt"
+	"os"
+	"strings"
 )
-
-type QueryRequest struct {
-	Query string `json:"query"`
-}
-
-type QueryResponse struct {
-	AST      string `json:"ast"`
-	Bytecode string `json:"bytecode"`
-	Result   string `json:"result"`
-	Error    string `json:"error,omitempty"`
-}
 
 func main() {
 
-	// ---- INIT DATABASE (same as before) ----
-
-	walManager, err := wal_manager.OpenWAL("databases/demoDB/logs")
+	walManager, err := wal_manager.OpenWAL("databases/demoDB/logs") // fixed for now, depends on database too
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Initialize B+ Tree with in-memory pager; table-specific on-disk indexes are opened per-table via GetOrCreateIndex
 	pager := bplus.NewInMemoryPager()
 	cache := bplus.NewBufferPool(10)
 	tree := bplus.NewBPlusTree(pager, cache, bytes.Compare)
 
+	// a must `USE DATABASE` command will initialize this
 	heapFileManager, err := heapfile.NewHeapFileManager("databases/demoDB")
 	if err != nil {
 		walManager.Close()
@@ -53,23 +44,42 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// ---- HTTP HANDLER ----
+	scanner := bufio.NewScanner(os.Stdin)
+	// REPL
+	for {
+		fmt.Print("daemon> ")
 
-	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
-
-		if r.Method != http.MethodPost {
-			http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
-			return
+		if !scanner.Scan() { // Ctrl+D pressed
+			break
 		}
 
-		var req QueryRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			http.Error(w, "Invalid JSON", http.StatusBadRequest)
-			return
+		line := strings.TrimSpace(scanner.Text())
+		if strings.EqualFold(line, "exit") {
+			break
+		}
+		if line == "" {
+			continue
 		}
 
-		query := req.Query
+		// user typed a single SQL query
+		query := line
+
+		/*
+			// printing tokens
+
+			l := lex.New(query)
+			tokens := []lex.Token{}
+			for {
+				tok := l.NextToken()
+				tokens = append(tokens, tok)
+				if tok.Kind == lex.END {
+					break
+				}
+			}
+			for i := range tokens {
+				fmt.Printf("kind: %s     value: %s\n", tokens[i].Kind, tokens[i].Value)
+			}
+		*/
 
 		// Lexer + Parser
 		l := lex.New(query)
@@ -77,37 +87,19 @@ func main() {
 
 		stmt := p.ParseStatement()
 
-		// AST output
-		astOutput := fmt.Sprintf("%#v", stmt)
+		fmt.Println("\n=== AST ===")
+		fmt.Printf("%#v", stmt)
 
-		// Bytecode
+		fmt.Println("\n\n=== Bytecode ===")
+
 		instructions := codegen.EmitBytecode(stmt)
-		bytecodeOutput := ""
 		for i, instr := range instructions {
-			bytecodeOutput += fmt.Sprintf(
-				"%d: OP=%v, VALUE=%v\n",
-				i, instr.Op, instr.Value,
-			)
+			fmt.Printf("%d: OP=%v, VALUE=%v\n", i, instr.Op, instr.Value)
 		}
 
-		// Execute
-		err = vm.Execute(instructions)
-
-		response := QueryResponse{
-			AST:      astOutput,
-			Bytecode: bytecodeOutput,
+		fmt.Println("\n=== Execution ===")
+		if err := vm.Execute(instructions); err != nil {
+			fmt.Printf("Error: %v\n", err)
 		}
-
-		if err != nil {
-			response.Error = err.Error()
-		} else {
-			response.Result = "Execution successful"
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-	})
-
-	log.Println("DaemonDB server running on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	}
 }
