@@ -4,7 +4,7 @@ import (
 	bplus "DaemonDB/bplustree"
 	heapfile "DaemonDB/heapfile_manager"
 	executor "DaemonDB/query_executor"
-	codegen "DaemonDB/query_parser/code-generator"
+	codegen "DaemonDB/query_parser/codegen"
 	lex "DaemonDB/query_parser/lexer"
 	"DaemonDB/query_parser/parser"
 	"DaemonDB/wal_manager"
